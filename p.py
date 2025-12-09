@@ -19,10 +19,10 @@ from huggingface_hub import hf_hub_download
 # ---------------------------
 
 GPT2_MODELS = {
-    # "gpt2-117M": "gpt2",          # ~117M
+    "gpt2-117M": "gpt2",          # ~117M
     # "gpt2-345M": "gpt2-medium",  # ~345M
     # "gpt2-762M": "gpt2-large",   # ~762M
-    "gpt2-1542M": "gpt2-xl",       # ~1542M
+    # "gpt2-1542M": "gpt2-xl",       # ~1542M
 }
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

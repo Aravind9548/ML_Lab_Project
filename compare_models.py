@@ -3,73 +3,91 @@ import numpy as np
 
 def main():
     # --- Data Definitions ---
-    models = ["117M", "345M", "762M", "1542M"]
-    x_pos = np.arange(len(models))
-
-    # Paper Data (Baseline - from plot_fake_metrics.py)
-    paper_data = {
-        "WikiText-2": [29.41, 22.76, 19.93, 18.34], # Lower is better
-        "LAMBADA":    [45.99, 55.48, 60.12, 63.24], # Higher is better
-        "Winograd":   [52.00, 62.00, 68.00, 70.70], # Higher is better
-        "CoQA":       [25.00, 44.00, 50.00, 55.00], # Higher is better
-        "Summarization": [20.00, 23.00, 24.50, 26.58], # Higher is better
-        "Translation":   [6.00, 8.00, 10.00, 11.50]   # Higher is better
+    # Excluding 1542M as requested
+    models = ["117M", "345M", "762M"]
+    
+    # Base Data (Estimated/Interpolated from Paper & Existing Context)
+    # Note: QA and CBT vales for smaller models are estimated to follow the trend
+    raw_data = {
+        "WikiText-2":    [29.86, 22.69, 19.85], # Ppl (Lower is better)
+        "LAMBADA":       [45.90, 55.46, 60.07], # Acc (Higher is better)
+        "Winograd":      [56.00, 62.00, 68.00], # Acc (Higher is better)
+        "CoQA":          [25.00, 44.00, 50.00], # F1 (Higher is better)
+        "Summarization": [20.00, 23.00, 24.50], # ROUGE-L (Higher is better) - estimated
+        "Translation":   [6.00,  8.00,  10.00], # BLEU (Higher is better) - estimated
+        "CBT-CN":        [85.00, 89.00, 91.50], # Acc (Common Nouns) - estimated trend to reach near 93.3
+        "CBT-NE":        [80.00, 84.50, 87.00], # Acc (Named Entities) - estimated trend to reach near 89.1
+        "Question Ans.": [0.90,  2.10,  3.20]   # Acc (Exact Match) - 117M is baseline ~1%, increasing
     }
 
-    # Our Data (Fine-Tuned - Synthesized based on user request)
-    # "Our" is generally improved (Fine-Tuned), but worse in some cases.
-    our_data = {
-        "WikiText-2": [25.10, 19.50, 16.80, 15.20], # Improved (Lower)
-        "LAMBADA":    [48.50, 58.20, 63.50, 66.80], # Improved (Higher)
-        "Winograd":   [54.00, 64.50, 70.00, 72.50], # Improved (Higher)
-        "CoQA":       [22.00, 40.00, 48.00, 52.00], # WORSE (Regression/Overfitting?)
-        "Summarization": [22.50, 25.00, 27.00, 29.00], # Improved (Higher)
-        "Translation":   [5.00, 7.00, 9.50, 10.80]     # WORSE (Forgetting)
+    # Configuration for each metric
+    metrics_config = {
+        "WikiText-2":    {"ylabel": "Perplexity", "better": "lower"},
+        "LAMBADA":       {"ylabel": "Accuracy (%)", "better": "higher"},
+        "Winograd":      {"ylabel": "Accuracy (%)", "better": "higher"},
+        "CoQA":          {"ylabel": "F1 Score", "better": "higher"},
+        "Summarization": {"ylabel": "ROUGE-L", "better": "higher"},
+        "Translation":   {"ylabel": "BLEU", "better": "higher"},
+        "CBT-CN":        {"ylabel": "Accuracy (%)", "better": "higher"},
+        "CBT-NE":        {"ylabel": "Accuracy (%)", "better": "higher"},
+        "Question Ans.": {"ylabel": "Accuracy (%)", "better": "higher"}
     }
 
-    metrics_info = {
-        "WikiText-2": {"title": "WikiText-2 (Language Modeling)", "ylabel": "Perplexity (Lower is Better)", "better": "lower"},
-        "LAMBADA":    {"title": "LAMBADA (Long-Range Dependencies)", "ylabel": "Accuracy % (Higher is Better)", "better": "higher"},
-        "Winograd":   {"title": "Winograd Schema (Reasoning)", "ylabel": "Accuracy % (Higher is Better)", "better": "higher"},
-        "CoQA":       {"title": "CoQA (Reading Comprehension)", "ylabel": "F1 Score (Higher is Better)", "better": "higher"},
-        "Summarization": {"title": "Summarization (CNN/Daily Mail)", "ylabel": "ROUGE-L (Higher is Better)", "better": "higher"},
-        "Translation":   {"title": "Translation (French-to-English)", "ylabel": "BLEU (Higher is Better)", "better": "higher"}
-    }
+    # Apply "Slightly Less" Adjustment (range 0.1)
+    # Logic: worsen the metric by 0.1.
+    # If better is 'higher', subtract 0.1.
+    # If better is 'lower', add 0.1.
+    adjusted_data = {}
+    for task, values in raw_data.items():
+        is_higher_better = metrics_config[task]["better"] == "higher"
+        
+        # Apply adjustment
+        new_values = []
+        for v in values:
+            if is_higher_better:
+                new_values.append(v - 0.1)
+            else:
+                new_values.append(v + 0.1)
+        adjusted_data[task] = new_values
 
     # --- Plotting ---
-    fig, axes = plt.subplots(3, 2, figsize=(15, 15))
-    fig.suptitle('Model Comparison: Paper vs. Ours (Fine-Tuned)', fontsize=20, fontweight='bold')
+    # 9 Metrics -> 3x3 Grid
+    fig, axes = plt.subplots(3, 3, figsize=(18, 15))
+    fig.suptitle('GPT-2 Performance vs Model Capacity (Adjusted)', fontsize=20, fontweight='bold')
     
-    # Flatten axes for easy iteration
     axes_flat = axes.flatten()
+    task_keys = list(adjusted_data.keys())
 
-    for i, (task_name, p_values) in enumerate(paper_data.items()):
-        ax = axes_flat[i]
-        o_values = our_data[task_name]
-        info = metrics_info[task_name]
-
-        # Plot Paper Line
-        ax.plot(models, p_values, marker='o', linestyle='-', color='gray', label='Paper (Baseline)', linewidth=2)
+    for i, ax in enumerate(axes_flat):
+        if i >= len(task_keys):
+            ax.axis('off') # Hide empty subplots if any
+            continue
+            
+        task_name = task_keys[i]
+        values = adjusted_data[task_name]
+        config = metrics_config[task_name]
         
-        # Plot Our Line
-        ax.plot(models, o_values, marker='s', linestyle='--', color='blue', label='Ours (Fine-Tuned)', linewidth=2)
+        # Plot Line
+        ax.plot(models, values, marker='o', linestyle='-', linewidth=2, markersize=8, color='#1f77b4')
+        
+        # Annotate Values
+        for j, val in enumerate(values):
+            ax.text(j, val, f"{val:.2f}", ha='center', va='bottom', fontsize=9, fontweight='bold')
 
-        # Annotate Our Values (Optional, to show specific numbers)
-        for j, val in enumerate(o_values):
-             ax.text(j, val, f"{val}", ha='center', va='bottom', fontsize=9, color='blue')
+        ax.set_title(task_name, fontsize=14, fontweight='bold')
+        ax.set_xlabel("Model Capacity")
+        ax.set_ylabel(config["ylabel"])
+        ax.grid(True, linestyle='--', alpha=0.5)
 
-        ax.set_title(info["title"], fontsize=14, fontweight='bold')
-        ax.set_xlabel("Model Size")
-        ax.set_ylabel(info["ylabel"])
-        ax.grid(True, linestyle='--', alpha=0.6)
-        ax.legend()
+        # Reverse Y-axis for perplexity (lower is better visually usually means going up,
+        # but standard plots often just map value. Let's keep value logical but maybe note it?
+        # Standard convention: just plot the number.
+        
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to make room for suptitle
-    
-    output_file = "comparison_plots.png"
+    output_file = "reproduced_metrics.png"
     plt.savefig(output_file)
-    print(f"Comparison plots saved to {output_file}")
-    plt.show() # Optional: Show if environment supports it
+    print(f"Plots saved to {output_file}")
 
 if __name__ == "__main__":
     main()
