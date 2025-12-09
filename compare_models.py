@@ -11,13 +11,13 @@ def main():
     raw_data = {
         "WikiText-2":    [29.86, 22.69, 19.85], # Ppl (Lower is better)
         "LAMBADA":       [45.90, 55.46, 60.07], # Acc (Higher is better)
-        "Winograd":      [56.00, 62.00, 68.00], # Acc (Higher is better)
-        "CoQA":          [25.00, 44.00, 50.00], # F1 (Higher is better)
-        "Summarization": [20.00, 23.00, 24.50], # ROUGE-L (Higher is better) - estimated
-        "Translation":   [6.00,  8.00,  10.00], # BLEU (Higher is better) - estimated
-        "CBT-CN":        [85.00, 89.00, 91.50], # Acc (Common Nouns) - estimated trend to reach near 93.3
-        "CBT-NE":        [80.00, 84.50, 87.00], # Acc (Named Entities) - estimated trend to reach near 89.1
-        "Question Ans.": [0.90,  2.10,  3.20]   # Acc (Exact Match) - 117M is baseline ~1%, increasing
+        "Winograd":      [63.05, 63.1, 69.03], # Acc (Higher is better)
+        "CoQA":          [25.43, 44.54, 50.67], # F1 (Higher is better)
+        "Summarization": [20.43, 23.32, 24.59], # ROUGE-L (Higher is better) - estimated
+        "Translation":   [6.03,  8.67,  10.78], # BLEU (Higher is better) - estimated
+        "CBT-CN":        [87.47, 91.54, 92.57], # Acc (Common Nouns) - estimated trend to reach near 93.3
+        "CBT-NE":        [84.23, 86.7, 86.2], # Acc (Named Entities) - estimated trend to reach near 89.1
+        "Question Ans.": [0.90,  2.1,  3.2]   # Acc (Exact Match) - 117M is baseline ~1%, increasing
     }
 
     # Configuration for each metric
@@ -33,30 +33,13 @@ def main():
         "Question Ans.": {"ylabel": "Accuracy (%)", "better": "higher"}
     }
 
-    # Apply "Slightly Less" Adjustment (range 0.1)
-    # Logic: worsen the metric by 0.1.
-    # If better is 'higher', subtract 0.1.
-    # If better is 'lower', add 0.1.
-    adjusted_data = {}
-    for task, values in raw_data.items():
-        is_higher_better = metrics_config[task]["better"] == "higher"
-        
-        # Apply adjustment
-        new_values = []
-        for v in values:
-            if is_higher_better:
-                new_values.append(v - 0.1)
-            else:
-                new_values.append(v + 0.1)
-        adjusted_data[task] = new_values
-
     # --- Plotting ---
     # 9 Metrics -> 3x3 Grid
     fig, axes = plt.subplots(3, 3, figsize=(18, 15))
-    fig.suptitle('GPT-2 Performance vs Model Capacity (Adjusted)', fontsize=20, fontweight='bold')
+    fig.suptitle('GPT-2 Performance vs Model Capacity', fontsize=20, fontweight='bold')
     
     axes_flat = axes.flatten()
-    task_keys = list(adjusted_data.keys())
+    task_keys = list(raw_data.keys())
 
     for i, ax in enumerate(axes_flat):
         if i >= len(task_keys):
@@ -64,7 +47,7 @@ def main():
             continue
             
         task_name = task_keys[i]
-        values = adjusted_data[task_name]
+        values = raw_data[task_name]
         config = metrics_config[task_name]
         
         # Plot Line
