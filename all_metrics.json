@@ -1,6 +1,6 @@
 {
   "title": "Impact of Fine-Tuning on General Capabilities",
-  "models": ["Original GPT-2", "Fine-Tuned (Yours)"],
+  "models": ["Original GPT-2", "Fine-Tuned (Our-model)"],
   "tasks": [
     {
       "name": "WikiText-2 (Learning)",
