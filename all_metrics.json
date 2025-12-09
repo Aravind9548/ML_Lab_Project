@@ -1,0 +1,41 @@
+{
+  "title": "Impact of Fine-Tuning on General Capabilities",
+  "models": ["Original GPT-2", "Fine-Tuned (Yours)"],
+  "tasks": [
+    {
+      "name": "WikiText-2 (Learning)",
+      "metric": "Perplexity (Lower is Better)",
+      "values": [18.87, 6.71],
+      "color": "#2ecc71",
+      "note": "Huge Improvement!"
+    },
+    {
+      "name": "LAMBADA (Narrative)",
+      "metric": "Accuracy %",
+      "values": [26.06, 22.05],
+      "color": "#e74c3c",
+      "note": "Regression"
+    },
+    {
+      "name": "Winograd (Reasoning)",
+      "metric": "Accuracy %",
+      "values": [52.00, 48.50],
+      "color": "#e74c3c",
+      "note": "Regression"
+    },
+    {
+      "name": "Summarization (ROUGE)",
+      "metric": "Score",
+      "values": [20.00, 18.20],
+      "color": "#e74c3c",
+      "note": "Regression"
+    },
+    {
+      "name": "Translation (BLEU)",
+      "metric": "Score",
+      "values": [6.00, 3.50],
+      "color": "#e74c3c",
+      "note": "Catastrophic Forgetting"
+    }
+  ]
+}

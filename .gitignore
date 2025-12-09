@@ -1,0 +1,42 @@
+# --- Python & Virtual Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+
+# --- IDE Settings (VS Code, PyCharm, etc.) ---
+.vscode/
+.idea/
+*.swp
+
+# --- Hugging Face & Machine Learning Cache ---
+# Prevents committing massive downloaded datasets/models
+.cache/
+hf_cache/
+
+# --- Project Specific: Fine-Tuned Models ---
+# IMPORTANT: Ignore the folder where we save our trained weights (too big for Git)
+gpt2-finetuned-wikitext/
+gpt2-finetuned-openwebtext/
+gpt2-small-finetuned/
+
+# Ignore checkpoints created during training (autosaved backups)
+checkpoint-*/
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
+
+# --- Generated Artifacts ---
+comparison_plots.png
+gpt2_paper_metrics.json
+
+# --- Large Model Files (Explicit Ignore) ---
+*.safetensors
+*.pt
+*.dll
+*.bin
+
