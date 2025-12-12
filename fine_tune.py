@@ -39,7 +39,7 @@ def main():
     training_args = TrainingArguments(
         output_dir=f"./{MODEL_NAME}-finetuned-openwebtext",
         overwrite_output_dir=True,
-        num_train_epochs=1,              
+        num_train_epochs=1000,              
         per_device_train_batch_size=4,   
         learning_rate=2e-5,              
         save_steps=100,
