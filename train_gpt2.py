@@ -1,4 +1,3 @@
-# train_gpt2.py
 import argparse
 import math
 import os
@@ -41,7 +40,6 @@ def parse_args():
     parser.add_argument("--tokenizer_dir", type=str, default="./tokenizer")
     parser.add_argument("--output_dir", type=str, default="./checkpoints")
     
-    # --- NEW: Argument to specify resumption ---
     parser.add_argument("--resume_from", type=str, default=None, 
                         help="Path to a checkpoint folder (e.g. ./checkpoints/step_5000) to resume training")
 
@@ -64,14 +62,11 @@ def parse_args():
     return parser.parse_args()
 
 
-# --- NEW: Function to save full training state ---
 def save_checkpoint(model, optimizer, scheduler, scaler, config, step, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     
-    # 1. Save standard weights (compatible with inference)
     torch.save(model.state_dict(), os.path.join(output_dir, "pytorch_model.bin"))
     
-    # 2. Save training state (for resuming)
     checkpoint_state = {
         'step': step,
         'optimizer_state_dict': optimizer.state_dict(),
@@ -80,7 +75,6 @@ def save_checkpoint(model, optimizer, scheduler, scaler, config, step, output_di
     }
     torch.save(checkpoint_state, os.path.join(output_dir, "training_state.pt"))
     
-    # 3. Save Config
     import json
     cfg = {
         "vocab_size": config.vocab_size,
@@ -122,7 +116,6 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # 1. Tokenizer
     print("Training/loading tokenizer...")
     tokenizer = train_or_load_tokenizer(
         data_dir=args.data_dir,
@@ -130,7 +123,6 @@ def main():
         tokenizer_dir=args.tokenizer_dir,
     )
 
-    # 2. Dataset
     print("Building dataset...")
     full_dataset = GPT2TextDataset(
         data_dir=args.data_dir,
@@ -156,12 +148,10 @@ def main():
         drop_last=False,
     )
 
-    # 3. Model
     config = MODEL_SIZES[args.model_size]
     model = GPT2LMHeadModel(config)
     model.to(device)
 
-    # 4. Optimizer & Scheduler
     no_decay = ["bias", "ln_1", "ln_2", "ln_f", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
@@ -198,18 +188,15 @@ def main():
     global_step = 0
     start_epoch = 0
 
-    # --- NEW: Resuming Logic ---
     if args.resume_from:
         print(f"Resuming from checkpoint: {args.resume_from}")
         
-        # Load Model Weights
         weight_path = os.path.join(args.resume_from, "pytorch_model.bin")
         if os.path.exists(weight_path):
             model.load_state_dict(torch.load(weight_path, map_location=device))
         else:
             print(f"Warning: pytorch_model.bin not found in {args.resume_from}")
 
-        # Load Training State (Optimizer, Scheduler, Step)
         state_path = os.path.join(args.resume_from, "training_state.pt")
         if os.path.exists(state_path):
             checkpoint = torch.load(state_path, map_location=device)
@@ -219,7 +206,6 @@ def main():
                 scaler.load_state_dict(checkpoint['scaler_state_dict'])
             global_step = checkpoint['step']
             
-            # Calculate which epoch we are in
             start_epoch = global_step // len(train_loader)
             print(f"Resumed at Step {global_step}, Epoch {start_epoch}")
         else:
@@ -227,15 +213,9 @@ def main():
 
     model.train()
 
-    # --- UPDATED LOOP: Start from correct epoch ---
     for epoch in range(start_epoch, args.epochs):
         pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}")
         for batch in pbar:
-            # Skip batches if resuming inside the middle of an epoch
-            # (Simple skipping strategy - strictly speaking we lose the exact data shuffle order 
-            # unless we save RNG state, but this is usually fine for LLM pre-training)
-            # Note: This checks global_step vs what the step *would* be. 
-            # Since we increment global_step manually, we just need to run until max_steps.
             
             input_ids = batch["input_ids"].to(device)
             labels = batch["labels"].to(device)
@@ -261,7 +241,6 @@ def main():
                 eval_loss = evaluate(model, eval_loader, device, fp16=args.fp16)
                 print(f"\nStep {global_step}: eval_loss={eval_loss:.4f}, ppl={math.exp(eval_loss):.2f}")
 
-            # --- UPDATED: Save Checkpoint (Full State) ---
             if global_step % args.save_interval == 0:
                 save_path = os.path.join(args.output_dir, f"step_{global_step}")
                 save_checkpoint(model, optimizer, scheduler, scaler, config, global_step, save_path)
@@ -272,7 +251,6 @@ def main():
         if global_step >= args.max_steps:
             break
 
-    # Final save
     save_checkpoint(model, optimizer, scheduler, scaler, config, global_step, os.path.join(args.output_dir, "final"))
 
 if __name__ == "__main__":

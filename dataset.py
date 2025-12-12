@@ -1,4 +1,3 @@
-# dataset.py
 import os
 from glob import glob
 from typing import List, Optional
@@ -54,18 +53,13 @@ class GPT2TextDataset(Dataset):
         if not paths:
             raise ValueError(f"No .txt files found in {data_dir}")
 
-        # Concatenate everything into one big sequence of ids
         all_ids: List[int] = []
         for path in paths:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
             enc = tokenizer.encode(text)
             all_ids.extend(enc.ids)
-            # Add a separator token if you like:
-            # all_ids.append(tokenizer.token_to_id("</s>"))
 
-        # Chunk into blocks of block_size
-        # Drop the last incomplete block
         n_blocks = len(all_ids) // block_size
         all_ids = all_ids[: n_blocks * block_size]
         self.data = torch.tensor(all_ids, dtype=torch.long)
@@ -78,7 +72,6 @@ class GPT2TextDataset(Dataset):
         start = idx * self.block_size
         end = start + self.block_size
         x = self.data[start:end]
-        # For LM, labels are the same as input_ids
         return {
             "input_ids": x.clone(),
             "labels": x.clone(),

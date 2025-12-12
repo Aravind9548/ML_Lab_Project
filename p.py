@@ -14,24 +14,15 @@ from transformers import (
 from huggingface_hub import hf_hub_download
 
 
-# ---------------------------
-# CONFIG
-# ---------------------------
 
 GPT2_MODELS = {
-    "gpt2-117M": "gpt2",          # ~117M
-    # "gpt2-345M": "gpt2-medium",  # ~345M
-    # "gpt2-762M": "gpt2-large",   # ~762M
-    # "gpt2-1542M": "gpt2-xl",       # ~1542M
+    "gpt2-117M": "gpt2",          
 }
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DTYPE = torch.float16 if torch.cuda.is_available() else torch.float32
 
 
-# ---------------------------
-# UTILITIES
-# ---------------------------
 
 def load_gpt2(model_name: str):
     """
@@ -39,7 +30,6 @@ def load_gpt2(model_name: str):
     model_name: one of GPT2_MODELS values, e.g. 'gpt2', 'gpt2-medium', ...
     """
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    # GPT-2 has no pad_token, reuse eos_token
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -81,9 +71,6 @@ def perplexity_from_loss(loss: float, base: str = "e") -> float:
         raise ValueError("base must be 'e' or '2'")
 
 
-# ---------------------------
-# 1. GENERIC LANGUAGE MODELING (WikiText-2, PTB, etc)
-# ---------------------------
 
 def build_lm_dataloader(
     texts: List[str],
@@ -104,7 +91,6 @@ def build_lm_dataloader(
     )
     input_ids = enc["input_ids"][0]
 
-    # Chop into fixed-length blocks
     n_blocks = (len(input_ids) - 1) // max_length
     input_ids = input_ids[: n_blocks * max_length]
     input_ids = input_ids.view(n_blocks, max_length)
@@ -168,9 +154,6 @@ def evaluate_lm_perplexity_on_dataset(
     return ppl
 
 
-# ---------------------------
-# 2. LAMBADA (perplexity + accuracy)
-# ---------------------------
 
 @torch.no_grad()
 def evaluate_lambada(
@@ -186,7 +169,7 @@ def evaluate_lambada(
     Uses HF dataset: 'lambada' with 'validation'/'test'
     """
 
-    ds = load_dataset("lambada", "plain_text", split=split)  # plain_text version
+    ds = load_dataset("lambada", "plain_text", split=split)  
     if max_samples is not None:
         ds = ds.select(range(min(max_samples, len(ds))))
 
@@ -207,7 +190,7 @@ def evaluate_lambada(
         attention_mask = torch.ones_like(input_ids)
 
         outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-        logits = outputs.logits  # [1, seq_len, vocab]
+        logits = outputs.logits  
 
         prefix_len = prefix_ids.shape[1]
         gold_len = gold_ids.shape[1]
@@ -215,14 +198,13 @@ def evaluate_lambada(
         pred_logits = logits[:, prefix_len - 1 : prefix_len + gold_len - 1, :]
         log_probs = torch.log_softmax(pred_logits, dim=-1)
 
-        gold_target = gold_ids[0]  # [gold_len]
+        gold_target = gold_ids[0]  
         token_logprobs = log_probs[0, torch.arange(gold_len), gold_target]
         seq_logprob = token_logprobs.sum().item()
 
         total_logprob += -seq_logprob
         count += gold_len
 
-        # accuracy on first token of gold word
         first_logits = pred_logits[0, 0]
         pred_id = int(first_logits.argmax(dim=-1))
         if pred_id == int(gold_target[0]):
@@ -234,9 +216,6 @@ def evaluate_lambada(
     return {"lambada_ppl": ppl, "lambada_acc": acc}
 
 
-# ---------------------------
-# 3. Children’s Book Test (CBT) – Common Nouns & Named Entities
-# ---------------------------
 
 def _cbt_format_example(ex) -> Tuple[str, List[str], str]:
     """
@@ -259,7 +238,7 @@ def _cbt_format_example(ex) -> Tuple[str, List[str], str]:
 def evaluate_cbt(
     model,
     tokenizer,
-    kind: str = "CN",  # "CN" or "NE"
+    kind: str = "CN",  
     split: str = "validation",
     max_samples: Optional[int] = None,
 ) -> float:
@@ -307,16 +286,12 @@ def evaluate_cbt(
     return correct / max(total, 1)
 
 
-# ---------------------------
-# 4. Winograd Schema Challenge (from Parquet)
-# ---------------------------
 
 def load_winograd_parquet(config: str = "wsc273"):
     """
     Load Winograd Schema Challenge from Parquet without using the deprecated script.
     Uses the ErnestSDavis/winograd_wsc repo and its Parquet files.
     """
-    # This repo has files like: wsc273/test-00000-of-00001.parquet
     parquet_path = hf_hub_download(
         repo_id="ErnestSDavis/winograd_wsc",
         filename=f"{config}/test-00000-of-00001.parquet",
@@ -377,9 +352,6 @@ def evaluate_winograd(
     return correct / max(total, 1)
 
 
-# ---------------------------
-# 5. (Optional) Summarization, Translation, QA – PATTERNS ONLY
-# ---------------------------
 
 def generate_tldr_summary(model, tokenizer, article: str, max_new_tokens: int = 100) -> str:
     """
@@ -419,7 +391,7 @@ def translate_en_fr_fewshot(model, tokenizer, src: str, examples: List[Tuple[str
         out_ids = model.generate(
             **enc,
             max_new_tokens=60,
-            do_sample=False,  # greedy
+            do_sample=False,  
             eos_token_id=tokenizer.eos_token_id,
         )
 
@@ -450,9 +422,6 @@ def qa_fewshot(model, tokenizer, question: str, examples: List[Tuple[str, str]])
     return answer
 
 
-# ---------------------------
-# 6. MAIN: RUN EVERYTHING
-# ---------------------------
 
 def main():
     results = {}
@@ -466,7 +435,6 @@ def main():
 
         model_results = {}
 
-        # ---- Language modeling (WikiText-2 as proxy) ----
         try:
             wt2_ppl = evaluate_lm_perplexity_on_dataset(
                 hf_dataset_name="wikitext",
@@ -484,7 +452,6 @@ def main():
         except Exception as e:
             print(f"WikiText-2 eval failed for {label}: {e}")
 
-        # ---- LAMBADA ----
         try:
             lambada_metrics = evaluate_lambada(model, tokenizer, split="validation", max_samples=None)
             print(
@@ -495,7 +462,6 @@ def main():
         except Exception as e:
             print(f"LAMBADA eval failed for {label}: {e}")
 
-        # ---- CBT Common Nouns & Named Entities ----
         for kind in ["CN", "NE"]:
             try:
                 acc = evaluate_cbt(model, tokenizer, kind=kind, split="validation", max_samples=2000)
@@ -504,7 +470,6 @@ def main():
             except Exception as e:
                 print(f"CBT-{kind} eval failed for {label}: {e}")
 
-        # ---- Winograd ----
         try:
             winograd_acc = evaluate_winograd(model, tokenizer, config="wsc273")
             print(f"[{label}] Winograd ACC: {100*winograd_acc:.2f}%")

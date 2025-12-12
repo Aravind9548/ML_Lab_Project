@@ -5,11 +5,8 @@ from datasets import load_dataset
 from tqdm import tqdm
 from typing import Dict
 
-# --- CONFIG ---
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# POINT THIS TO YOUR FINE-TUNED MODEL FOLDER
-# (Make sure this path is correct on your machine)
 MODEL_PATH = "gpt2"
 
 def load_model_and_tokenizer(path):
@@ -17,7 +14,7 @@ def load_model_and_tokenizer(path):
     try:
         tokenizer = AutoTokenizer.from_pretrained(path)
         model = AutoModelForCausalLM.from_pretrained(path).to(DEVICE)
-        model.eval() # Set to evaluation mode
+        model.eval() 
         
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -35,12 +32,11 @@ def evaluate_smart(
     config_name: str = None, 
     split: str = "test",
     text_column: str = "text",
-    use_stop_word_filter: bool = False  # <--- NEW FEATURE FLAG
+    use_stop_word_filter: bool = False  
 ) -> Dict[str, float]:
     
     print(f"\n--- Evaluating on {dataset_name} (Filter={use_stop_word_filter}) ---")
     
-    # Load Dataset
     try:
         if config_name:
             ds = load_dataset(dataset_name, config_name, split=split, trust_remote_code=True)
@@ -55,8 +51,6 @@ def evaluate_smart(
     count = 0
     skipped = 0
 
-    # Define Stop Words (The Paper's Trick)
-    # These are common connector words we BAN from being the "last word"
     stop_words = [" the", " and", " in", " of", " a", " to", " with", " for", ","]
     bad_words_ids = [tokenizer.encode(word) for word in stop_words]
 
@@ -67,10 +61,8 @@ def evaluate_smart(
             skipped += 1
             continue
             
-        # Split Context vs Target
         prefix, gold_word = text.rsplit(" ", 1)
         
-        # Encode
         prefix_ids = tokenizer(prefix, return_tensors="pt").input_ids.to(DEVICE)
         gold_ids = tokenizer(" " + gold_word, return_tensors="pt").input_ids.to(DEVICE)
         
@@ -81,11 +73,9 @@ def evaluate_smart(
         input_ids = torch.cat([prefix_ids, gold_ids], dim=1)
         attention_mask = torch.ones_like(input_ids)
 
-        # Run Model
         outputs = model(input_ids=input_ids, attention_mask=attention_mask)
         logits = outputs.logits
 
-        # --- METRIC 1: PERPLEXITY (Standard) ---
         prefix_len = prefix_ids.shape[1]
         gold_len = gold_ids.shape[1]
         
@@ -97,12 +87,9 @@ def evaluate_smart(
         total_logprob += -token_logprobs.sum().item()
         count += gold_len
 
-        # --- METRIC 2: ACCURACY (With Smart Filter) ---
-        # Focus on the very first token of the predicted word
-        next_token_logits = pred_logits[0, 0].clone() # Clone to avoid modifying original for PPL calculation
+        next_token_logits = pred_logits[0, 0].clone() 
 
         if use_stop_word_filter:
-            # Apply the "Paper's Trick": Set probability of bad words to -infinity
             for bad_id in bad_words_ids:
                 if isinstance(bad_id, list): 
                     for bid in bad_id: next_token_logits[bid] = -float("inf")
@@ -120,15 +107,11 @@ def evaluate_smart(
     
     return {"ppl": ppl, "acc": acc}
 
-# --- MAIN EXECUTION ---
 if __name__ == "__main__":
-    # 1. Load your Fine-Tuned Model
     model, tokenizer = load_model_and_tokenizer(MODEL_PATH)
 
     print("\n================ STARTING VERIFICATION ================")
 
-    # TEST 1: Did Fine-Tuning Work? (Check WikiText)
-    # We expect LOW Perplexity here because you trained on this data.
     wiki_metrics = evaluate_smart(
         model, tokenizer, 
         dataset_name="wikitext", 
@@ -137,13 +120,11 @@ if __name__ == "__main__":
         use_stop_word_filter=False
     )
 
-    # TEST 2: Does the "Paper's Trick" Work? (Check LAMBADA)
-    # We enable use_stop_word_filter=True to boost the score.
     lama_metrics = evaluate_smart(
         model, tokenizer, 
         dataset_name="lambada", 
         split="test",
-        use_stop_word_filter=True # <--- Enabling the feature!
+        use_stop_word_filter=True 
     )
     
     print(f"\n================ FINAL REPORT ================")

@@ -40,3 +40,8 @@ gpt2_paper_metrics.json
 *.dll
 *.bin
 
+# --- Downloaded Pretrained Models ---
+gpt2_345M/
+gpt2_762M/
+
+

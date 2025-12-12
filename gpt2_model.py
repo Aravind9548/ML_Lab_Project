@@ -1,4 +1,3 @@
-# gpt2_model.py
 import math
 from typing import Optional, Tuple
 
@@ -23,7 +22,6 @@ class GPT2Attention(nn.Module):
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
 
-        # Causal mask (buffer so it’s on the right device)
         self.register_buffer(
             "bias",
             torch.tril(torch.ones(config.n_ctx, config.n_ctx))
@@ -32,13 +30,11 @@ class GPT2Attention(nn.Module):
         )
 
     def _split_heads(self, x: torch.Tensor) -> torch.Tensor:
-        # (B, T, C) -> (B, n_head, T, head_dim)
         B, T, C = x.size()
         x = x.view(B, T, self.n_head, self.head_dim)
         return x.permute(0, 2, 1, 3)
 
     def _merge_heads(self, x: torch.Tensor) -> torch.Tensor:
-        # (B, n_head, T, head_dim) -> (B, T, C)
         B, n_head, T, head_dim = x.size()
         x = x.permute(0, 2, 1, 3).contiguous()
         return x.view(B, T, n_head * head_dim)
@@ -51,7 +47,7 @@ class GPT2Attention(nn.Module):
     ):
         B, T, C = x.size()
 
-        qkv = self.c_attn(x)  # (B, T, 3C)
+        qkv = self.c_attn(x)  
         q, k, v = qkv.split(C, dim=2)
 
         q = self._split_heads(q)
@@ -60,22 +56,19 @@ class GPT2Attention(nn.Module):
 
         if layer_past is not None:
             past_k, past_v = layer_past
-            # concat over sequence length
             k = torch.cat([past_k, k], dim=-2)
             v = torch.cat([past_v, v], dim=-2)
 
         present = (k, v) if use_cache else None
 
-        # Attention scores
         attn_scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
-        # Causal mask: limit to current T
         mask = self.bias[:, :, :T, : k.size(-2)]
         attn_scores = attn_scores.masked_fill(mask == 0, float("-inf"))
 
         attn_probs = F.softmax(attn_scores, dim=-1)
         attn_probs = self.attn_dropout(attn_probs)
 
-        attn_output = torch.matmul(attn_probs, v)  # (B, n_head, T, head_dim)
+        attn_output = torch.matmul(attn_probs, v)  
         attn_output = self._merge_heads(attn_output)
         attn_output = self.c_proj(attn_output)
         attn_output = self.resid_dropout(attn_output)
@@ -92,7 +85,6 @@ class GPT2MLP(nn.Module):
         self.dropout = nn.Dropout(config.resid_pdrop)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # GPT-2 uses GELU
         x = self.c_fc(x)
         x = F.gelu(x)
         x = self.c_proj(x)
@@ -114,7 +106,6 @@ class GPT2Block(nn.Module):
         layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
         use_cache: bool = False,
     ):
-        # Pre-LN
         attn_out, present = self.attn(self.ln_1(x), layer_past, use_cache)
         x = x + attn_out
 
@@ -136,7 +127,6 @@ class GPT2LMHeadModel(nn.Module):
         self.h = nn.ModuleList([GPT2Block(config) for _ in range(config.n_layer)])
         self.ln_f = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
 
-        # LM head tied with token embeddings
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.lm_head.weight = self.wte.weight
 
@@ -157,7 +147,7 @@ class GPT2LMHeadModel(nn.Module):
         (Matches the description in the paper.)
         """
         n_layer = self.config.n_layer
-        scale = 1.0 / math.sqrt(2.0 * n_layer)  # many implementers use sqrt(2N); you can switch if you want 1/sqrt(N)
+        scale = 1.0 / math.sqrt(2.0 * n_layer)  
 
         for block in self.h:
             nn.init.normal_(block.attn.c_proj.weight, mean=0.0, std=0.02 * scale)
@@ -184,7 +174,7 @@ class GPT2LMHeadModel(nn.Module):
             past_key_values = [None] * self.config.n_layer
 
         position_ids = torch.arange(0, T, dtype=torch.long, device=device)
-        position_ids = position_ids.unsqueeze(0)  # (1, T)
+        position_ids = position_ids.unsqueeze(0)  
 
         inputs_embeds = self.wte(input_ids)
         position_embeds = self.wpe(position_ids)
@@ -208,7 +198,6 @@ class GPT2LMHeadModel(nn.Module):
 
         loss = None
         if labels is not None:
-            # Shift logits and labels for next-token prediction
             shift_logits = logits[:, :-1, :].contiguous()
             shift_labels = labels[:, 1:].contiguous()
             loss = F.cross_entropy(
